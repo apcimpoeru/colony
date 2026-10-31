@@ -79,7 +79,10 @@ that system.
 
 ## Next steps
 
-Add obstacle navigation and reachability checks, then further Sim systems.
+Build the colonist's daily behavior in an open test area, starting with need
+prioritization. Navigation is deferred for now.
+
+See [ROADMAP.md](ROADMAP.md) for the planned order and deferred features.
 
 
 
