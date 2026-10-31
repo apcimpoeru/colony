@@ -1,0 +1,1 @@
+If you need context of the project, read Assets/PROJECT_CONTEXT.md.
