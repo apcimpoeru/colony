@@ -1,5 +1,0 @@
-{
-    "name": "Colony.PlayMode.Tests",
-    "references": ["Colony.Runtime"],
-    "optionalUnityReferences": ["TestAssemblies"]
-}

@@ -1,0 +1,14 @@
+{
+    "name":  "Colony.Items.EditMode.Tests",
+    "references":  [
+                       "Colony.Runtime",
+                       "Colony.Testing.Runtime",
+                       "Colony.Testing"
+                   ],
+    "includePlatforms":  [
+                             "Editor"
+                         ],
+    "optionalUnityReferences":  [
+                                    "TestAssemblies"
+                                ]
+}

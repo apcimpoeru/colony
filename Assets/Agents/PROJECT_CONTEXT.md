@@ -21,30 +21,50 @@ available need when food cannot currently be used; sleep can use the floor.
 Colonists now show a runtime status panel above them with hunger, energy, and
 their current activity.
 
+## Project structure
+
+Gameplay code lives under `Assets/Features`, grouped into Items, Inventory,
+Storage, Food, Sleep, Needs, Movement, and Colonists. Each area keeps its editor
+tools in `Editor` and its tests in `Tests/EditMode` or `Tests/PlayMode` beside the
+runtime scripts. Items contains item definitions, InventoryStack, and WorldItem;
+Food contains eating and source selection. Colonists contains the controller,
+work priorities, and status display.
+
+All gameplay scripts share `Assets/Colony.Runtime.asmdef`. Feature editor and
+test folders have separate assembly definitions to keep editor/test dependencies
+out of runtime builds. Shared Editor-only helpers live in `Assets/Testing` in
+`Colony.Testing`; component/Play Mode helpers live in `Assets/Testing/Runtime`
+in the test-only `Colony.Testing.Runtime` assembly. Add tests beside the feature
+they cover, with a test assembly definition when introducing a new test folder.
+
+Scenes, materials, prefabs, and item assets keep their existing locations.
+Run all Edit Mode and Play Mode tests through Unity's Test Runner or
+`Tools/Run-Tests.ps1`; see TEST_ROADMAP.md for the commands.
+
 ## Main systems
 
-- Sim/SimInventory: serialized inventory, eight slots by default with configurable
+- Features/Inventory/SimInventory: serialized inventory, eight slots by default with configurable
   capacity. Add fills existing stacks before empty slots and returns quantity
   accepted. TryRemove removes the full requested amount or changes nothing.
   Count and Contains query contents; Changed fires once after a successful mutation.
   Stacks exposes a read-only view. Null items and nonpositive quantities are rejected.
   Lowering capacity below occupied slots preserves items but prevents new slots.
-- Item/ItemDefinition: ScriptableObject with display name, icon, and maximum stack
+- Features/Items/ItemDefinition: ScriptableObject with display name, icon, and maximum stack
   size (default 20). Item identity is the definition asset, not its display name.
-- Item/FoodDefinition: item subtype with level (minimum/default 1), nonnegative nourishment (default 15),
+- Features/Items/FoodDefinition: item subtype with level (minimum/default 1), nonnegative nourishment (default 15),
   and nonnegative happiness (default 0). Happiness is stored data only; no Sim mood
   system or happiness effect is implemented.
   Compatible with SimInventory; SimEating uses nourishment to reduce hunger.
-- Item/InventoryStack: read-only item and quantity for callers; mutated by inventory.
-- Sim/SimController: forwards the public destinationOverride GameObject position
+- Features/Items/InventoryStack: read-only item and quantity for callers; mutated by inventory.
+- Features/Colonists/SimController: forwards the public destinationOverride GameObject position
   to movement. Clearing or destroying the destination stops movement; disabling
   the controller also stops movement. Manual destinations interrupt sleep and food seeking.
   Food and sleep compete using need urgency; sleep uses an assigned bed or the floor.
-- Sim/SimNeeds: tracks hunger (0 = full, 100 = starving) and energy (0 = exhausted,
+- Features/Needs/SimNeeds: tracks hunger (0 = full, 100 = starving) and energy (0 = exhausted,
   100 = rested), with configurable rates defaulting to +1 hunger and -0.5 energy
   per second. Energy decay pauses while resting; hunger continues to increase.
   SimSleeping owns the resting flag and clears it on waking or cancellation.
-- Sim/SimEating: starts eating at configurable hunger threshold (default 60),
+- Features/Food/SimEating: starts eating at configurable hunger threshold (default 60),
   consumes highest-level nourishing food first, choosing lowest positive nourishment within that level,
   then waits one scaled game second between items. Once started, the food need stays active
   until hunger reaches Stop Eating Threshold (default 30) or lower, including when
@@ -53,10 +73,10 @@ their current activity.
   Removes one inventory item per meal, clamps hunger at zero, and ignores non-food.
   Equal level and nourishment use inventory order. Zero-nourishment food is ignored
   by automatic eating and world-food searches.
-- Sim/SimMovement: horizontal Rigidbody movement in FixedUpdate, arrival checks,
+- Features/Movement/SimMovement: horizontal Rigidbody movement in FixedUpdate, arrival checks,
   movement speed, and stopping distance. Preserves vertical velocity for gravity
   and freezes rotation. No obstacle navigation or reachability checks yet.
-- Sim/SimController need prioritization: compares hunger and sleep urgency when both
+- Features/Colonists/SimController need prioritization: compares hunger and sleep urgency when both
   solutions are available, keeps the current activity within a configurable switch
   margin, interrupts for critical hunger or energy, and selects the available
   alternative when only food or sleep can be used. Sleeping does not require a bed.
@@ -168,18 +188,18 @@ See [ROADMAP.md](ROADMAP.md) for the planned order and deferred features.
   capacity, empty/full/disabled containers, need interruptions, and two Sims withdrawing
   the final item. Set hunger to 80 with no carried food to check automatic pantry use.
   Put nearby loose food of different levels beside it to check the shared preference.
-- Tools > Verify Storage and Food runs component-level checks in an empty scene;
-  StorageVerification.RunBatch supports an isolated Unity batch project. It verifies
-  conservation, notifications, repeated stacks, overflow, access range, competing
-  withdrawals, transfer trips, and storage/loose-food preference and fallback.
-  It also checks conflicting critical food/sleep decisions. In an isolated batch
-  project, CriticalNeedsVerification.RunBatch adds real Play Mode checks starting
-  at 100 hunger and 0 energy, with carried food and with a pantry. Both scenarios
-  must reduce critical hunger before sleeping and then recover energy.
+- Standard Unity Edit Mode and Play Mode tests now cover storage access, transfers,
+  conservation, notifications, repeated stacks, overflow, competing withdrawals,
+  trips, food selection, and critical-needs decisions. The two former custom
+  verification runners have been retired. `SimControllerIntegrationTests` runs
+  both critical-needs regressions with real Update/LateUpdate/physics: carried
+  food and pantry food, each starting at 100 hunger and 0 energy. Both must eat
+  below critical hunger before sleeping, then recover energy without repeated
+  food/bed trips. See TEST_ROADMAP.md for suite commands and remaining visual checks.
 
 ## Visible needs and activity
 
-- Sim/SimStatusDisplay draws a compact Game view panel above each colonist using
+- Features/Colonists/SimStatusDisplay draws a compact Game view panel above each colonist using
   runtime IMGUI. It shows the GameObject name, activity, numeric hunger and energy
   out of 100, and colored bars. High hunger is bad; low energy is bad.
 - SimController.ActivityLabel reads current behavior: Idle, Moving to destination,
@@ -213,11 +233,11 @@ See [ROADMAP.md](ROADMAP.md) for the planned order and deferred features.
 
 ## World food pickup
 
-- Item/WorldItem links a scene object to an ItemDefinition, quantity, and optional
+- Features/Items/WorldItem links a scene object to an ItemDefinition, quantity, and optional
   accessible Pickup Point. Active objects register for nearest-food searches and
   support one-Sim reservations. Pickup transfers only accepted quantities and
   destroys the GameObject when empty; partial stacks stay in the world.
-- Sim/SimEating also supplies destinations to SimController when hunger reaches
+- Features/Food/SimEating also supplies destinations to SimController when hunger reaches
   SimEating.HungerThreshold and inventory has no nourishing FoodDefinition items.
   Seeking continues below that starting threshold until the stop threshold is reached. Searches
   at most once per scaled second and skips food that cannot fit. Uses straight-line

@@ -1,0 +1,13 @@
+{
+    "name":  "Colony.Food.EditMode.Tests",
+    "references":  [
+                       "Colony.Runtime",
+                       "Colony.Testing.Runtime"
+                   ],
+    "includePlatforms":  [
+                             "Editor"
+                         ],
+    "optionalUnityReferences":  [
+                                    "TestAssemblies"
+                                ]
+}

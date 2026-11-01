@@ -1,0 +1,5 @@
+{
+    "name": "Colony.Colonists.Editor",
+    "references": ["Colony.Runtime"],
+    "includePlatforms": ["Editor"]
+}

@@ -1,0 +1,5 @@
+{
+    "name": "Colony.Inventory.Editor",
+    "references": ["Colony.Runtime"],
+    "includePlatforms": ["Editor"]
+}

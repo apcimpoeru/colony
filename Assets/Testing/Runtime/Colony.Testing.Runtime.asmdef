@@ -1,0 +1,5 @@
+{
+    "name": "Colony.Testing.Runtime",
+    "references": ["Colony.Runtime"],
+    "optionalUnityReferences": ["TestAssemblies"]
+}

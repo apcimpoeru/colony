@@ -1,0 +1,10 @@
+{
+    "name":  "Colony.Storage.PlayMode.Tests",
+    "references":  [
+                       "Colony.Runtime",
+                       "Colony.Testing.Runtime"
+                   ],
+    "optionalUnityReferences":  [
+                                    "TestAssemblies"
+                                ]
+}

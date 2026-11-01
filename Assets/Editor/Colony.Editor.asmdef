@@ -1,5 +1,0 @@
-{
-    "name": "Colony.Editor",
-    "references": ["Colony.Runtime"],
-    "includePlatforms": ["Editor"]
-}
