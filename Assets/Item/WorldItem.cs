@@ -4,6 +4,7 @@ using UnityEngine;
 public sealed class WorldItem : MonoBehaviour
 {
     private static readonly HashSet<WorldItem> activeItems = new HashSet<WorldItem>();
+    internal static IEnumerable<WorldItem> ActiveItems => activeItems;
 
     [SerializeField] private ItemDefinition item;
     [SerializeField, Min(1)] private int quantity = 1;

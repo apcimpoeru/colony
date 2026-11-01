@@ -5,12 +5,15 @@ using UnityEngine;
 public sealed class SimSleeping : MonoBehaviour
 {
     [SerializeField, Range(0f, 99.99f)]
-    [Tooltip("Seek the assigned bed when energy reaches this level or lower.")]
+    [Tooltip("Seek the assigned bed, or sleep on the floor, when energy reaches this level or lower.")]
     private float sleepThreshold = 20f;
     [SerializeField, Range(0.01f, 100f)]
     [Tooltip("Wake when energy reaches this level or higher.")]
     private float wakeThreshold = 90f;
     [SerializeField, Min(0.01f)] private float energyRecoveryPerSecond = 5f;
+    [SerializeField, Range(0.01f, 1f)]
+    [Tooltip("Fraction of normal energy recovery when sleeping without an assigned active bed.")]
+    private float floorRecoveryMultiplier = 0.5f;
     [SerializeField, Min(0.01f)] private float sleepDistance = 0.75f;
 
     private SimNeeds needs;
@@ -19,7 +22,23 @@ public sealed class SimSleeping : MonoBehaviour
     private bool wantsSleep;
 
     public bool IsSleeping { get; private set; }
+    public bool IsSleepingOnFloor => IsSleeping && CurrentBed == null;
+    public float CurrentRecoveryPerSecond => !IsSleeping ? 0f
+        : energyRecoveryPerSecond * (IsSleepingOnFloor ? floorRecoveryMultiplier : 1f);
     public SimBed CurrentBed { get; private set; }
+    public bool CanSleep => isActiveAndEnabled && colonist != null && colonist.isActiveAndEnabled
+        && needs != null && needs.isActiveAndEnabled && movement != null && movement.isActiveAndEnabled;
+    public bool WantsSleep => wantsSleep || (needs != null && needs.Energy <= sleepThreshold);
+    public float SleepUrgency => Mathf.InverseLerp(100f, sleepThreshold, needs != null ? needs.Energy : 100f);
+
+    public bool HasAssignedBed()
+    {
+        if (!isActiveAndEnabled || colonist == null || !colonist.isActiveAndEnabled)
+            return false;
+
+        return CurrentBed != null && CurrentBed.IsAssignedTo(colonist)
+            || SimBed.FindAssignedBed(colonist) != null;
+    }
 
     private void Awake()
     {
@@ -47,7 +66,7 @@ public sealed class SimSleeping : MonoBehaviour
         {
             if (CurrentBed != null && !IsSleeping)
                 destination = CurrentBed.Position;
-            return wantsSleep && CurrentBed != null;
+            return wantsSleep && (IsSleeping || CurrentBed != null);
         }
 
         if (needs.Energy >= wakeThreshold)
@@ -61,25 +80,25 @@ public sealed class SimSleeping : MonoBehaviour
 
         wantsSleep = true;
         if (CurrentBed == null || !CurrentBed.IsAssignedTo(colonist))
-        {
-            SetSleeping(false);
             CurrentBed = SimBed.FindAssignedBed(colonist);
-        }
-        if (CurrentBed == null)
-            return false;
 
-        Vector3 offset = CurrentBed.Position - transform.position;
-        offset.y = 0f;
-        float range = Mathf.Max(sleepDistance, movement.StoppingDistance);
-        if (offset.sqrMagnitude > range * range)
+        // An assigned bed is preferred, including one assigned during floor sleep.
+        // Without one, rest where we are and let the controller stop movement.
+        if (CurrentBed != null)
         {
-            SetSleeping(false);
-            destination = CurrentBed.Position;
-            return true;
+            Vector3 offset = CurrentBed.Position - transform.position;
+            offset.y = 0f;
+            float range = Mathf.Max(sleepDistance, movement.StoppingDistance);
+            if (offset.sqrMagnitude > range * range)
+            {
+                SetSleeping(false);
+                destination = CurrentBed.Position;
+                return true;
+            }
         }
 
         SetSleeping(true);
-        needs.Energy += energyRecoveryPerSecond * deltaTime;
+        needs.Energy += CurrentRecoveryPerSecond * deltaTime;
         if (needs.Energy >= wakeThreshold)
             Cancel();
 
@@ -109,6 +128,7 @@ public sealed class SimSleeping : MonoBehaviour
         sleepThreshold = Mathf.Clamp(sleepThreshold, 0f, 99.99f);
         wakeThreshold = Mathf.Clamp(wakeThreshold, sleepThreshold + 0.01f, 100f);
         energyRecoveryPerSecond = Mathf.Max(0.01f, energyRecoveryPerSecond);
+        floorRecoveryMultiplier = Mathf.Clamp(floorRecoveryMultiplier, 0.01f, 1f);
         sleepDistance = Mathf.Max(0.01f, sleepDistance);
     }
 }

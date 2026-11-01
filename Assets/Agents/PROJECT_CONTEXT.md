@@ -9,9 +9,17 @@ one household. It is in the planning stage.
 
 Sims support manual GameObject destinations and basic Rigidbody movement.
 Hunger increases and energy decreases over scaled game time, clamped to 0–100.
-Automatic inventory eating and nearest-world-food seeking are implemented.
+Automatic inventory eating and food seeking from loose items or shared storage are implemented.
+Storage containers use slot-based inventories; Sims can travel to deposit or pick up items.
 Colonists seek their Inspector-assigned beds at low energy, sleep to recover, and wake.
+Without an assigned active bed, they sleep in place on the floor at half recovery
+by default; Floor Recovery Multiplier on SimSleeping controls this fraction.
 Sims can now carry items in a separate slot-based inventory. Further systems are planned.
+SimController now prioritizes hunger versus sleep using normalized urgency, critical
+need interruption thresholds, and an activity switch margin. It falls back to the
+available need when food cannot currently be used; sleep can use the floor.
+Colonists now show a runtime status panel above them with hunger, energy, and
+their current activity.
 
 ## Main systems
 
@@ -31,7 +39,7 @@ Sims can now carry items in a separate slot-based inventory. Further systems are
 - Sim/SimController: forwards the public destinationOverride GameObject position
   to movement. Clearing or destroying the destination stops movement; disabling
   the controller also stops movement. Manual destinations interrupt sleep and food seeking.
-  Assigned-bed sleep takes priority over food seeking while energy is low.
+  Food and sleep compete using need urgency; sleep uses an assigned bed or the floor.
 - Sim/SimNeeds: tracks hunger (0 = full, 100 = starving) and energy (0 = exhausted,
   100 = rested), with configurable rates defaulting to +1 hunger and -0.5 energy
   per second. Energy decay pauses while resting; hunger continues to increase.
@@ -48,6 +56,16 @@ Sims can now carry items in a separate slot-based inventory. Further systems are
 - Sim/SimMovement: horizontal Rigidbody movement in FixedUpdate, arrival checks,
   movement speed, and stopping distance. Preserves vertical velocity for gravity
   and freezes rotation. No obstacle navigation or reachability checks yet.
+- Sim/SimController need prioritization: compares hunger and sleep urgency when both
+  solutions are available, keeps the current activity within a configurable switch
+  margin, interrupts for critical hunger or energy, and selects the available
+  alternative when only food or sleep can be used. Sleeping does not require a bed.
+  The defaults are a 0.15 urgency
+  switch margin, critical hunger 85, and critical energy 10.
+  When both needs are critical and usable food exists, food takes precedence until
+  hunger falls below Critical Hunger, including between bites. Critical exhaustion
+  then takes over. Without usable food, the Sim can still sleep. This prevents
+  food/bed oscillation at very high hunger and very low energy.
 
 ## Running and checking
 
@@ -61,17 +79,23 @@ Drag a scene GameObject into Destination Override to move toward it; clear it to
 stop. Moving that object updates the destination. Arrival checks ignore height.
 Configure speed and stopping distance on SimMovement (defaults 2 and 0.2).
 
+Configure Need Prioritization on SimController with Activity Switch Margin,
+Critical Hunger, and Critical Energy. A larger switch margin makes the current
+activity more persistent; critical values allow the corresponding need to interrupt
+the other activity.
+
 Add SimInventory to a Sim to give it storage. Create item assets using
 Assets > Create > Item > Item Definition, or Item > Food Definition for food with
 nourishment. Existing generic item assets remain generic; create a Food Definition
 asset to define food. Other systems can call Add, TryRemove,
 Count, and Contains with those assets. SimEating consumes food to restore hunger;
-energy is restored by sleeping in an assigned bed. Set SimNeeds hunger to 80 and supply inventory
+energy is restored by sleeping in an assigned bed or on the floor. Set SimNeeds hunger to 80 and supply inventory
 food to try eating. Disable SimEating to keep only manual movement and need decay.
 Configure Items on SimInventory in the Inspector by assigning item assets and
 quantities. This serialized list IS the live inventory: eating decreases quantities
 and removes empty stacks directly. Previous Starting Items entries migrate to Items.
-Awake repacks contents to respect stack limits and capacity, warning about excess.
+Awake repacks contents to respect stack limits. Over-capacity starting contents are
+preserved with a warning; no new slots can be added until space is freed.
 Play Mode edits affect live contents; Unity resets Play Mode changes when play stops.
 There is no runtime inventory UI, equipment, or weight system yet.
 The obsolete editor verification for automatic need decisions was removed with
@@ -79,10 +103,111 @@ that system.
 
 ## Next steps
 
-Build the colonist's daily behavior in an open test area, starting with need
-prioritization. Navigation is deferred for now.
+Continue with basic mining and farming work as separate steps in an open test area
+using the implemented storage, item transfers, and numerical work priorities. Need
+prioritization and visible needs are implemented. Idle behavior is last in the roadmap.
+Navigation is deferred for now.
 
 See [ROADMAP.md](ROADMAP.md) for the planned order and deferred features.
+
+## Work priorities
+
+- Select a colonist and expand Work Priorities on SimController in the Inspector.
+  Mining and Farming each have a dropdown: 0 disables the type, 1 is highest,
+  and 4 is lowest. Both default to 3 (Normal), including on existing Sims.
+  Edit outside Play Mode to save priorities; Play Mode edits last only for that session.
+- SimWorkPriorities is serialized per colonist inside SimController, so no extra
+  component or scene setup is needed. It ranks work only; food, sleep, and manual
+  destinations retain their current behavior.
+- SimController.WorkPriorities.ChooseAvailableWorkType accepts a read-only task
+  availability callback and returns the highest-priority enabled available work
+  type, or null. Equal priorities select Mining before Farming. Disabled and
+  unavailable types are skipped. GetPriority returns a type's numerical priority.
+- Mining/farming targets, task reservations, and work execution are not implemented
+  yet. The next mining and farming steps will connect available
+  tasks to this selection policy.
+
+## Storage and item transfers
+
+- Create a storage GameObject and add ItemStorage. It requires SimInventory;
+  configure Capacity and Items there, just as for a colonist. Add a visible mesh
+  or collider as desired. Place it on accessible ground. An optional Interaction
+  Point beside the container lets Sims stand outside its collider; Interaction
+  Distance defaults to 0.75, raised to the Sim's stopping distance when needed.
+- Containers are shared. Multiple Sims can approach the same container; quantities
+  are rechecked at arrival. Storage does not reserve an entire container or promise
+  items before arrival. Ownership and access permissions remain deferred.
+- On SimController, expand Storage Transfer and assign Storage. Select Deposit All,
+  Deposit Item, or Pick Up Item. The latter two use Item and Quantity. In Play Mode,
+  click Start storage transfer. The Sim travels there and transfers what fits once;
+  it does not repeat automatically. This works on existing Sims without extra components.
+  Start another request to replace the current one, or click Cancel storage transfer.
+  Configuration edits during a trip apply to the next request.
+- Food and sleep pause the trip, which resumes when those activities finish.
+  Manual destinations and disabling the controller cancel the request. Destroyed
+  or disabled storage, empty sources, full destinations, and five scaled seconds
+  without progress end the request with a status message. Pausing game time also
+  pauses travel and transfers. The status panel and Inspector report transfer state.
+- ItemStorage.Deposit, DepositAll, and Withdraw require the carrier to be in range.
+  SimInventory.TransferTo and TransferAllTo supply the underlying capacity-aware
+  transfers. Partial transfers leave the remainder at the source. Both inventories
+  are updated before Changed notifications, so observers never see duplicated items.
+  Future mining/farming code can issue trips via SimController.StorageTransfer.Request.
+- Hungry Sims automatically consider storage and loose food together after carried
+  food. Find the nearest usable source, then prefer the highest food level within
+  nearest distance + SimEating's Food Preference Distance. Equal levels choose the
+  nearest source; equal-distance options prefer lower positive nourishment. Searches
+  ignore disabled/empty containers and food that cannot fit in the carrier's inventory.
+  Storage food is withdrawn one item at a time, then eaten with the existing thresholds
+  and one-second cooldown. Loose-food pickup still collects as much as fits.
+- Food trips use the same no-progress timeout and retry delay for containers as for
+  loose food. Manual movement, sleeping, or disabling eating cancels food seeking.
+  A full carrier with no food cannot retrieve a meal until inventory space is freed.
+- Quick check: put food and generic items in a reachable container, clear the Sim's
+  manual destination, and try each transfer direction in Play Mode. Test partial
+  capacity, empty/full/disabled containers, need interruptions, and two Sims withdrawing
+  the final item. Set hunger to 80 with no carried food to check automatic pantry use.
+  Put nearby loose food of different levels beside it to check the shared preference.
+- Tools > Verify Storage and Food runs component-level checks in an empty scene;
+  StorageVerification.RunBatch supports an isolated Unity batch project. It verifies
+  conservation, notifications, repeated stacks, overflow, access range, competing
+  withdrawals, transfer trips, and storage/loose-food preference and fallback.
+  It also checks conflicting critical food/sleep decisions. In an isolated batch
+  project, CriticalNeedsVerification.RunBatch adds real Play Mode checks starting
+  at 100 hunger and 0 energy, with carried food and with a pantry. Both scenarios
+  must reduce critical hunger before sleeping and then recover energy.
+
+## Visible needs and activity
+
+- Sim/SimStatusDisplay draws a compact Game view panel above each colonist using
+  runtime IMGUI. It shows the GameObject name, activity, numeric hunger and energy
+  out of 100, and colored bars. High hunger is bad; low energy is bad.
+- SimController.ActivityLabel reads current behavior: Idle, Moving to destination,
+  At destination, Seeking food, Eating, Going to bed, Sleeping, Sleeping on floor,
+  or Controller disabled.
+  It does not run need selection or reserve food/beds. Eating stays visible for
+  the one-second interval after a bite, including the final bite.
+- Below the activity, ActivityDetails explains food and rest separately, including
+  unmet goals and blockers. A hungry colonist with no usable food shows Idle and
+  "Looking for food: none available." A tired colonist without a usable assigned
+  bed sleeps on the floor; the details show the actual energy recovery per second
+  and whether they are in bed or on the floor. Available needs deferred
+  by the other activity show that they are waiting. Explanations use the last
+  decision's availability results; displaying them does not search or reserve targets.
+  Detail text wraps and the panel grows to fit it.
+- SimStatusDisplay is included on the Sim prefab and both existing scenes.
+  New SimController components require it automatically. For other existing Sims,
+  add SimStatusDisplay manually. No Canvas, fonts, or EventSystem setup is needed.
+- A camera tagged MainCamera is required. Panels follow the configured World Offset
+  (default 1.5 units above the Sim), remain within the screen edges, and hide when
+  their anchor is behind or outside the camera. Panel Width defaults to 220 pixels.
+  Disable SimStatusDisplay to hide a panel. Nearby colonists' panels may overlap;
+  this is a simple readout for the open test area.
+- Enter Play Mode in either scene and watch hunger rise and energy fall. Give a
+  hungry colonist carried food or reachable world food to check Eating and Seeking
+  food. Assign a reachable SimBed and lower energy to check Going to bed, Sleeping,
+  and recovery. Set/clear Destination Override to check manual movement and arrival.
+  Pause with Time.timeScale = 0: the panels stay visible and needs stop changing.
 
 
 
@@ -138,24 +263,38 @@ checks remain unchanged.
 - Set an optional Sleep Point to an accessible child Transform beside a solid bed.
   Without a Sleep Point, the bed Transform is the destination. The Sim stays at that
   point; no teleporting, lying-down animation, or collider changes are performed.
-- Add SimSleeping manually to existing colonists if missing. New SimController
+- SimSleeping is included on the Sim prefab and colonists in both existing scenes.
+  Add it manually to other existing colonists if missing. New SimController
   components require it automatically. Configure Sleep Threshold (default 20),
-  Wake Threshold (90), Energy Recovery Per Second (5), and Sleep Distance (0.75)
+  Wake Threshold (90), Energy Recovery Per Second (5), Floor Recovery Multiplier (0.5),
+  and Sleep Distance (0.75)
   on SimSleeping. Wake Threshold is clamped above Sleep Threshold.
-- When energy reaches the sleep threshold or lower, SimController prioritizes the
-  assigned bed over food seeking and releases any food reservation. It stops movement
+- When energy reaches the sleep threshold or lower, SimController considers sleep
+  alongside food using need prioritization. Choosing sleep releases any food reservation.
+  If an assigned active bed exists, it stops movement
   within the larger of Sleep Distance and movement Stopping Distance, restores energy
   using scaled game time, and wakes at the wake threshold or higher. Energy does not
   decay while resting. Sims cannot eat while asleep; hunger still increases. Food in
   inventory may still be eaten while travelling to bed.
-- A started sleep trip continues until waking or interruption. Manual destinations,
-  disabling the controller/sleep component, or losing bed access interrupt sleeping.
+- A started sleep trip or floor sleep continues until waking or interruption.
+  Manual destinations, critical hunger with available food, or disabling the
+  controller/sleep component interrupt sleeping.
   Reassigning, disabling, or destroying a bed is checked on the next unpaused tick;
-  the Sim uses another assigned bed if one exists. If multiple beds are assigned to
+  the Sim uses another assigned bed if one exists, otherwise sleeps on the floor.
+  A bed assigned during floor sleep is used on the next unpaused tick.
+  If multiple beds are assigned to
   one colonist, the nearest is selected when starting a trip; a valid current bed is kept.
-- Without an assigned active bed, the colonist continues other activities and energy
-  keeps decreasing. There is no ground-sleep fallback. Bed seeking uses the existing
+- Without an assigned active bed, the colonist stops and sleeps at their current
+  position. Recovery is Energy Recovery Per Second times Floor Recovery Multiplier
+  (default 5 * 0.5 = 2.5 energy per scaled second). The multiplier is configurable
+  from 0.01 to 1. Energy decay pauses, hunger continues, and eating is blocked, just
+  as in bed. Floor sleep uses the same sleep/wake thresholds and interruption rules.
+  There is no lying-down animation or search for a floor position.
+  Bed seeking uses the existing
   straight-line movement; obstacle navigation and unreachable-bed recovery remain future work.
 - To try it, assign a reachable bed, clear Destination Override, set energy to 10,
   and enter Play Mode. Check travel, recovery, waking, manual interruption, and bed
-  reassignment. Pausing Time.timeScale also pauses travel, recovery, and need decay.
+  reassignment. Remove/disable the assigned bed to check floor sleep and half-rate
+  recovery; change Floor Recovery Multiplier to verify its effect. Assign a bed
+  while sleeping on the floor to check the transition back to bed.
+  Pausing Time.timeScale also pauses travel, recovery, and need decay.

@@ -23,24 +23,45 @@ public sealed class SimEating : MonoBehaviour
     [Tooltip("How many game seconds to skip food after failing to reach it.")]
     private float unreachableRetryDelay = 15f;
     private const float ProgressDistance = 0.1f;
-    private readonly Dictionary<WorldItem, float> ignoredFood = new Dictionary<WorldItem, float>();
-    private readonly List<WorldItem> expiredFood = new List<WorldItem>();
+    private readonly Dictionary<Object, float> ignoredFood = new Dictionary<Object, float>();
+    private readonly List<Object> expiredFood = new List<Object>();
     private float progressDistance;
     private float lastProgressTime;
     private bool wantsFood;
     private const float SearchInterval = 1f;
     private SimMovement movement;
-    private WorldItem target;
+    private SimFoodSource target;
     private float nextSearchTime;
-    public WorldItem CurrentTarget => target;
+    public WorldItem CurrentTarget => target != null ? target.WorldItem : null;
+    public ItemStorage CurrentStorage => target != null ? target.Storage : null;
+    public bool HasTarget => target != null;
+    public Vector3? FoodDestination => target != null && target.Key != null ? target.Position : (Vector3?)null;
 
     private const float ItemCooldown = 1f;
     private SimNeeds needs;
     private SimInventory inventory;
     private float nextEatTime;
 
-    public bool IsEating { get; private set; }
+    // Keep the final bite visible for its eating interval, even if it fills the Sim.
+    public bool IsEating => isActiveAndEnabled && needs != null
+        && needs.isActiveAndEnabled && !needs.IsResting && Time.time < nextEatTime;
     public float HungerThreshold => hungerThreshold;
+    public bool WantsFood => UpdateAppetite();
+    public float FoodUrgency => Mathf.InverseLerp(hungerThreshold, 100f, needs != null ? needs.Hunger : 0f);
+
+    public bool HasFoodSource()
+    {
+        if (!isActiveAndEnabled || needs == null || inventory == null
+            || !inventory.isActiveAndEnabled || !UpdateAppetite())
+            return false;
+
+        if (FindPreferredFood() != null)
+            return true;
+
+        ClearExpiredIgnoredFood();
+        return SimFoodSource.Find(this, inventory, foodPreferenceDistance,
+            key => !ignoredFood.ContainsKey(key)) != null;
+    }
 
     private void Awake()
     {
@@ -56,33 +77,24 @@ public sealed class SimEating : MonoBehaviour
             return;
 
         if (needs.IsResting)
-        {
-            IsEating = false;
             return;
-        }
 
         if (!UpdateAppetite())
-        {
-            IsEating = false;
             return;
-        }
 
         if (Time.time < nextEatTime)
             return;
 
         FoodDefinition food = FindPreferredFood();
         if (food == null)
-        {
-            IsEating = false;
             return;
-        }
 
         if (!inventory.TryRemove(food, 1))
             return;
 
         needs.Hunger -= food.Nourishment;
         nextEatTime = Time.time + ItemCooldown;
-        IsEating = UpdateAppetite() && FindPreferredFood() != null;
+        UpdateAppetite();
     }
 
     private bool UpdateAppetite()
@@ -123,17 +135,15 @@ public sealed class SimEating : MonoBehaviour
             return null;
         }
 
-        if (target != null && (!target.IsAvailableFor(this)
-            || !(target.Item is FoodDefinition food) || food.Nourishment <= 0f
-            || !inventory.HasSpaceFor(target.Item)))
+        if (target != null && !target.IsAvailable(this, inventory))
             Cancel();
 
         if (target == null && Time.time >= nextSearchTime)
         {
             nextSearchTime = Time.time + SearchInterval;
             ClearExpiredIgnoredFood();
-            WorldItem candidate = WorldItem.FindNearestFood(this, inventory, foodPreferenceDistance,
-                candidateFood => !ignoredFood.ContainsKey(candidateFood));
+            SimFoodSource candidate = SimFoodSource.Find(this, inventory, foodPreferenceDistance,
+                key => !ignoredFood.ContainsKey(key));
             if (candidate != null && candidate.TryReserve(this))
             {
                 target = candidate;
@@ -145,12 +155,12 @@ public sealed class SimEating : MonoBehaviour
         if (target == null)
             return null;
 
-        float range = Mathf.Max(pickupDistance, movement.StoppingDistance);
+        float range = target.PickupRange(pickupDistance, movement.StoppingDistance);
         Vector3 offset = target.Position - transform.position;
         offset.y = 0f;
         if (offset.sqrMagnitude <= range * range)
         {
-            target.TryPickup(this, inventory, range);
+            target.Pickup(this, inventory, range);
             Cancel();
             return null;
         }
@@ -163,7 +173,7 @@ public sealed class SimEating : MonoBehaviour
         }
         else if (Time.time - lastProgressTime >= noProgressTimeout)
         {
-            ignoredFood[target] = Time.time + unreachableRetryDelay;
+            ignoredFood[target.Key] = Time.time + unreachableRetryDelay;
             Cancel();
             nextSearchTime = Time.time;
             return null;
@@ -182,12 +192,12 @@ public sealed class SimEating : MonoBehaviour
     private void ClearExpiredIgnoredFood()
     {
         expiredFood.Clear();
-        foreach (KeyValuePair<WorldItem, float> entry in ignoredFood)
+        foreach (KeyValuePair<Object, float> entry in ignoredFood)
         {
             if (entry.Key == null || Time.time >= entry.Value)
                 expiredFood.Add(entry.Key);
         }
-        foreach (WorldItem item in expiredFood)
+        foreach (Object item in expiredFood)
             ignoredFood.Remove(item);
     }
 
@@ -200,7 +210,6 @@ public sealed class SimEating : MonoBehaviour
 
     private void OnDisable()
     {
-        IsEating = false;
         wantsFood = false;
         ignoredFood.Clear();
         expiredFood.Clear();

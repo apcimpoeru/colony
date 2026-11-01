@@ -537,6 +537,8 @@ GameObject:
   - component: {fileID: 631716555}
   - component: {fileID: 631716554}
   - component: {fileID: 631716553}
+  - component: {fileID: 910010001}
+  - component: {fileID: 910020001}
   m_Layer: 0
   m_Name: 'Sim 2 '
   m_TagString: Untagged
@@ -1089,6 +1091,8 @@ GameObject:
   - component: {fileID: 1631783403}
   - component: {fileID: 1631783402}
   - component: {fileID: 1631783401}
+  - component: {fileID: 910010002}
+  - component: {fileID: 910020002}
   m_Layer: 0
   m_Name: Sim 2  (1)
   m_TagString: Untagged
@@ -1293,3 +1297,65 @@ SceneRoots:
   - {fileID: 485837671}
   - {fileID: 918989944}
   - {fileID: 1157899898}
+--- !u!114 &910010001
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 631716550}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b05a587a11a44542a8e923fca9da090c, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  worldOffset: {x: 0, y: 1.5, z: 0}
+  panelWidth: 220
+--- !u!114 &910010002
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1631783399}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b05a587a11a44542a8e923fca9da090c, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  worldOffset: {x: 0, y: 1.5, z: 0}
+  panelWidth: 220
+--- !u!114 &910020001
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 631716550}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 405c969cba5740be920f49b68db9fcc7, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  sleepThreshold: 20
+  wakeThreshold: 90
+  energyRecoveryPerSecond: 5
+  floorRecoveryMultiplier: 0.5
+  sleepDistance: 0.75
+--- !u!114 &910020002
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1631783399}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 405c969cba5740be920f49b68db9fcc7, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  sleepThreshold: 20
+  wakeThreshold: 90
+  energyRecoveryPerSecond: 5
+  floorRecoveryMultiplier: 0.5
+  sleepDistance: 0.75

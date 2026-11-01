@@ -42,14 +42,22 @@ public sealed class SimInventory : MonoBehaviour
             if (entry == null || entry.Item == null || entry.Quantity <= 0)
                 continue;
 
-            int added = Add(entry.Item, entry.Quantity);
-            if (added < entry.Quantity)
-                Debug.LogWarning($"{name}: only kept {added} of {entry.Quantity} "
-                    + $"{entry.Item.DisplayName}; inventory is full.", this);
+            AddInternal(entry.Item, entry.Quantity, true);
         }
+        if (UsedSlots > Capacity)
+            Debug.LogWarning($"{name}: initial contents exceed capacity; items were preserved. "
+                + "Remove items before adding new stacks.", this);
     }
     /// <summary>Fills matching stacks, then empty slots. Returns the amount accepted.</summary>
     public int Add(ItemDefinition item, int quantity)
+    {
+        int added = AddInternal(item, quantity);
+        if (added > 0)
+            Changed?.Invoke();
+        return added;
+    }
+
+    private int AddInternal(ItemDefinition item, int quantity, bool preserveOverflow = false)
     {
         if (item == null || quantity <= 0)
             return 0;
@@ -67,17 +75,14 @@ public sealed class SimInventory : MonoBehaviour
                 break;
         }
 
-        while (remaining > 0 && stacks.Count < Capacity)
+        while (remaining > 0 && (preserveOverflow || stacks.Count < Capacity))
         {
             int amount = Mathf.Min(remaining, item.MaxStackSize);
             stacks.Add(new InventoryStack(item, amount));
             remaining -= amount;
         }
 
-        int added = quantity - remaining;
-        if (added > 0)
-            Changed?.Invoke();
-        return added;
+        return quantity - remaining;
     }
 
     /// <summary>Removes the full amount, or leaves the inventory unchanged.</summary>
@@ -86,6 +91,13 @@ public sealed class SimInventory : MonoBehaviour
         if (item == null || quantity <= 0 || !Contains(item, quantity))
             return false;
 
+        RemoveInternal(item, quantity);
+        Changed?.Invoke();
+        return true;
+    }
+
+    private void RemoveInternal(ItemDefinition item, int quantity)
+    {
         int remaining = quantity;
         for (int i = stacks.Count - 1; i >= 0 && remaining > 0; i--)
         {
@@ -100,8 +112,37 @@ public sealed class SimInventory : MonoBehaviour
                 stacks.RemoveAt(i);
         }
 
+    }
+
+    /// <summary>Moves only what fits. Both inventories are updated before notifying observers.</summary>
+    public int TransferTo(SimInventory destination, ItemDefinition item, int quantity)
+    {
+        if (destination == null || destination == this || !isActiveAndEnabled
+            || !destination.isActiveAndEnabled || item == null || quantity <= 0)
+            return 0;
+
+        int amount = Mathf.Min(quantity, Count(item));
+        int moved = destination.AddInternal(item, amount);
+        if (moved == 0)
+            return 0;
+        RemoveInternal(item, moved);
         Changed?.Invoke();
-        return true;
+        destination.Changed?.Invoke();
+        return moved;
+    }
+
+    public int TransferAllTo(SimInventory destination)
+    {
+        // Transfers can remove stacks and notify listeners; iterate a snapshot.
+        InventoryStack[] snapshot = new InventoryStack[stacks.Count];
+        for (int i = 0; i < stacks.Count; i++)
+            if (stacks[i] != null)
+                snapshot[i] = new InventoryStack(stacks[i].Item, stacks[i].Quantity);
+        int moved = 0;
+        foreach (InventoryStack stack in snapshot)
+            if (stack != null)
+                moved += TransferTo(destination, stack.Item, stack.Quantity);
+        return moved;
     }
 
     public int Count(ItemDefinition item)
