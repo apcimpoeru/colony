@@ -40,26 +40,56 @@ can change as the story and gameplay develop.
    stored food alongside loose food, using one shared nearest-source neighborhood
    and the existing food-level preference, hunger thresholds, and eating cooldown.
    Mining and farming will issue transfer requests automatically in their steps.
-5. [ ] **Basic work: mining.** Use the numerical Mining priority to select work
+5. [ ] **Notifications panel.** Show notifications from every Sim in one shared
+   panel, grouped by Sim. Use three categories: Important, Warning, and Regular.
+   Order Sim groups by their highest notification category and show the current
+   notification count for each category. Let the player remove notifications one
+   by one. Keep the first version simple while supporting hundreds of colonists;
+   see the plan below.
+6. [ ] **Basic work: mining.** Use the numerical Mining priority to select work
    at a designated mining spot. Travel there and work over game time, adding mined
    items directly to the Sim's inventory. When no more mined items fit, travel to
    storage, deposit the output, and return to mining. Handle unavailable or full
    storage without losing items. Define task completion and cancellation, and
    reserve active mining spots so multiple colonists do not work the same target.
-6. [ ] **Basic work: farming.** Use the numerical Farming priority to select work
+7. [ ] **Basic work: farming.** Use the numerical Farming priority to select work
    at a designated plot. Retrieve needed supplies (such as seeds) from storage,
    plant a crop, let it grow over game time, then return to harvest it. Growth does
    not occupy the colonist; they can do other available work while waiting.
    Planting and harvesting are tasks within the farming work type. Deposit harvested
    items in storage. Define task completion and cancellation, and reserve active
    tasks so multiple colonists do not work the same target.
-7. [ ] **Work and rest routines.** Let colonists work autonomously, take breaks
+8. [ ] **Work and rest routines.** Let colonists work autonomously, take breaks
    for food and sleep, and return to work afterward.
-8. [ ] **Mood.** Make food happiness, adequate sleep, and unmet needs affect mood.
-9. [ ] **Social interaction.** Let colonists seek company and build relationships;
+9. [ ] **Mood.** Make food happiness, adequate sleep, and unmet needs affect mood.
+10. [ ] **Social interaction.** Let colonists seek company and build relationships;
    choose the details to support the story.
-10. [ ] **Idle behavior.** Give colonists a simple activity when needs are satisfied
+11. [ ] **Idle behavior.** Give colonists a simple activity when needs are satisfied
    and there is no work to do.
+
+## Notification plan
+
+- [ ] **Shared panel.** Display notifications from all Sims in one scrollable
+  list, grouped by Sim. Each group identifies the Sim and contains their
+  notification entries, each with a message and category: Important, Warning,
+  or Regular.
+- [ ] **Priority and counts.** Order Sim groups by their highest remaining
+  notification category: Important first, then Warning, then Regular. Within each
+  group, sort entries in the same category order. Keep equal-priority ordering
+  stable. Show separate counts of notifications currently in the panel for all
+  three categories; these count entries, not Sims.
+- [ ] **Individual removal.** Give each entry a remove button. Removing it takes
+  it out of the list and immediately updates its category count and the group's
+  priority. Remove the Sim's group when its final notification is removed.
+- [ ] **Simple communication.** Sims send notifications to one shared collection;
+  the panel updates when entries are added or removed. Avoid scanning every Sim
+  each frame or broadcasting between Sims. Support hundreds of colonists by
+  reusing list rows and drawing only visible entries.
+- [ ] **Checks.** Verify notifications from multiple Sims, all three category
+  counts, grouping by Sim, group/entry priority ordering, and individual removal,
+  including group reordering and removal of empty groups. Check responsiveness with
+  hundreds of colonists and a long notification list. Add concrete coverage to
+  [TEST_ROADMAP.md](TEST_ROADMAP.md) when the scripts are introduced.
 
 ## Deferred features
 
