@@ -17,4 +17,4 @@ MonoBehaviour:
   maxStackSize: 20
   level: 2
   happiness: 0
-  nourishment: 10
+  nourishment: 25
